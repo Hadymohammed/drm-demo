@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Shaka Player DRM + ABR Demo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
+</head>
+
+<body>
+
+  <h2>🎥 DRM + ABR Player</h2>
+
+  <video id="video" width="800" controls autoplay></video>
+
+  <br><br>
+
+  <!-- 🎛️ Quality Selector -->
+  <label>Quality:</label>
+  <select id="quality"></select>
+
+  <br><br>
+
+  <button id="goLiveBtn">🔴 Go Live</button>
+
+  <script>
+    const video = document.getElementById('video');
+    const player = new shaka.Player(video);
+    const goLiveBtn = document.getElementById('goLiveBtn');
+
+    const qualitySelect = document.getElementById('quality');
+    
+
+    // 🔐 DRM ClearKey
+    player.configure({
+      drm: {
+        servers: {
+          // 'com.widevine.alpha': 'http://192.168.1.102:3000/license?type=widevine',
+          'org.w3.clearkey': 'http://localhost:3000/license?type=clearkey&token=correct',
+        }
+      }
+    });
+
+    // intercept segment requests to add token
+    player.getNetworkingEngine().registerRequestFilter((type, request) => {
+      if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+        const url = new URL(request.uris[0]);
+        url.searchParams.set('token', 'correct');
+        request.uris[0] = url.toString();
+        console.log('🔗 Modified segment request URL:', request.uris[0]);
+      }
+    });
+
+    async function init() {
+      try {
+        // await player.load('http://localhost:4000/manifest.mpd');
+        if (isSafari()) {
+          console.warn('⚠️ Safari detected - using HLS');
+          await player.load('http://192.168.1.102:4000/live/master.m3u8?token=correct');
+        } else {
+          // console.warn()
+          await player.load('http://192.168.1.102:4000/live/manifest.mpd?token=correct');
+        }
+        console.log(`✅ Video loaded successfully! type: ${player.isLive() ? 'Live' : 'VOD'} `);
+        if (player.isLive()) {
+            player.configure({
+              streaming: {
+                lowLatencyMode: true,
+                bufferingGoal: 6,
+                rebufferingGoal: 2,
+                bufferBehind: 10,
+                retryParameters: {
+                  maxAttempts: 10,
+                  baseDelay: 500
+                }
+              },
+              manifest: {
+                retryParameters: {
+                  maxAttempts: 10
+                }
+              }
+            });
+
+            video.currentTime = player.seekRange().end;
+          }
+
+          video.play();
+        setupQualitySelector();
+
+      } catch (e) {
+        console.error('❌ Error loading video:', e);
+      }
+    }
+
+    
+    function setupQualitySelector() {
+      const tracks = player.getVariantTracks();
+
+      // Clear dropdown
+      qualitySelect.innerHTML = '<option value="auto">Auto</option>';
+
+      tracks.forEach(track => {
+        const option = document.createElement('option');
+        option.value = track.id;
+        option.textContent = track.height + 'p';
+        qualitySelect.appendChild(option);
+      });
+
+      qualitySelect.addEventListener('change', () => {
+        const value = qualitySelect.value;
+
+        if (value === 'auto') {
+          player.configure({ abr: { enabled: true } });
+          console.log('🔄 ABR enabled');
+          return;
+        }
+
+        player.configure({ abr: { enabled: false } });
+
+        const track = tracks.find(t => t.id == value);
+        if (track) {
+          player.selectVariantTrack(track, true);
+          console.log('🎯 Switched to', track.height + 'p');
+        }
+      });
+    }
+
+    function isSafari() {
+        return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      }
+    // 📊 Log ABR switching
+    player.addEventListener('adaptation', () => {
+      const active = player.getVariantTracks().find(t => t.active);
+      if (active) {
+        console.log('📊 Auto switched to:', active.height + 'p');
+      }
+    });
+
+    // ❌ Error logging
+    player.addEventListener('error', e => {
+      console.error('Player error:', e.detail);
+    });
+
+    goLiveBtn.addEventListener('click', () => {
+      console.log('🔴 Go Live button clicked');
+      if (!player.isLive()) {
+          console.warn('⚠️ Not a live stream - cannot go live');
+        return;
+      }
+      const seekRange = player.seekRange();
+      console.log('⏩ Seeking to live edge:', seekRange.end);
+      video.currentTime = seekRange.end;      
+    });
+
+    init();
+    
+  </script>
+
+</body>
+</html>

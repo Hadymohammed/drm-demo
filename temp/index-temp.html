@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔐 DRM Video Player - Clear Key</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 900px;
+      width: 100%;
+      padding: 30px;
+    }
+    
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+    
+    .header h1 {
+      font-size: 24px;
+      color: #333;
+    }
+    
+    .drm-badge {
+      background: #667eea;
+      color: white;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
+    video {
+      width: 100%;
+      height: auto;
+      background: #000;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    label {
+      font-weight: 600;
+      color: #555;
+      font-size: 14px;
+    }
+    
+    select, button {
+      padding: 10px 15px;
+      border: 2px solid #667eea;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    select {
+      background: white;
+      color: #333;
+    }
+    
+    select:hover {
+      border-color: #764ba2;
+    }
+    
+    button {
+      background: #667eea;
+      color: white;
+      font-weight: 600;
+      border: none;
+    }
+    
+    button:hover {
+      background: #764ba2;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    button.live {
+      background: #ff6b6b;
+    }
+    
+    button.live:hover {
+      background: #ee5a52;
+    }
+    
+    .info-panel {
+      background: #f8f9fa;
+      border-left: 4px solid #667eea;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 20px;
+    }
+    
+    .info-panel h3 {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 10px;
+    }
+    
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      font-size: 12px;
+    }
+    
+    .info-item {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .info-label {
+      color: #666;
+      font-weight: 600;
+    }
+    
+    .info-value {
+      color: #333;
+      margin-top: 2px;
+      font-family: 'Courier New', monospace;
+      word-break: break-all;
+    }
+    
+    .status {
+      padding: 10px 15px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border-left: 4px solid #28a745;
+    }
+    
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border-left: 4px solid #f5c6cb;
+    }
+    
+    .status.loading {
+      background: #d1ecf1;
+      color: #0c5460;
+      border-left: 4px solid #bee5eb;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔐 DRM Video Player</h1>
+      <span class="drm-badge">Clear Key DRM</span>
+    </div>
+
+    <video id="video" controls></video>
+
+    <div id="status" class="status loading">⏳ Initializing player...</div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="streamType">Stream Type:</label>
+        <select id="streamType">
+          <option value="dash">DASH (Recommended)</option>
+          <option value="hls">HLS</option>
+        </select>
+      </div>
+      
+      <div class="control-group">
+        <label for="quality">Quality:</label>
+        <select id="quality">
+          <option value="auto">Auto (Adaptive)</option>
+          <option value="144p">144p</option>
+          <option value="240p">240p</option>
+        </select>
+      </div>
+
+      <button id="loadBtn">📂 Load Stream</button>
+      <button id="goLiveBtn" class="live">🔴 Go Live</button>
+    </div>
+
+    <div class="info-panel">
+      <h3>📊 Stream Information</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <span class="info-label">Current Resolution:</span>
+          <span class="info-value" id="resolution">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Bitrate:</span>
+          <span class="info-value" id="bitrate">-</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">DRM Status:</span>
+          <span class="info-value" id="drmStatus">🔒 Clear Key</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">License Server:</span>
+          <span class="info-value" id="licenseServer">http://localhost:3000</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const player = new shaka.Player(video);
+    const statusDiv = document.getElementById('status');
+    const streamTypeSelect = document.getElementById('streamType');
+    const qualitySelect = document.getElementById('quality');
+    const loadBtn = document.getElementById('loadBtn');
+    const goLiveBtn = document.getElementById('goLiveBtn');
+    const resolutionDiv = document.getElementById('resolution');
+    const bitrateDiv = document.getElementById('bitrate');
+
+    const hlsUrl = 'http://localhost:4000/live/master.m3u8?token=correct';
+    const dashUrl = 'http://localhost:4000/live/manifest.mpd?token=correct';
+
+    // ========== DRM Configuration ==========
+    player.configure({
+      drm: {
+        servers: {
+          // Clear Key license server
+          'org.w3c.clearkey': 'http://localhost:3000/license?token=correct&type=clearkey',
+        },
+        // Disable ads banner
+        // disableAds: true
+      },
+      // streaming: {
+      //   bufferBehind: 5,
+      //   bufferingGoal: 6,
+      //   rebufferingGoal: 8,
+      //   lowLatencyMode: true,
+      //   autoLowLatencyMode: true
+      // },
+      // // Advanced settings
+      // manifest: {
+      //   clockSyncUri: '',
+      //   defaultPresentationDelay: 0,
+      //   segmentRelativeUrls: true,
+      //   dash: {
+      //     ignoreEmptySegments: true,
+      //     clockSyncUri: ''
+      //   }
+      // }
+      streaming: {
+        lowLatencyMode: true,
+        bufferingGoal: 6,
+        rebufferingGoal: 2,
+        bufferBehind: 10,
+        retryParameters: {
+          maxAttempts: 10,
+          baseDelay: 500
+        }
+      },
+      manifest: {
+        retryParameters: {
+          maxAttempts: 10
+        }
+      }
+    });
+
+    // Update stats every second
+    function updateStats() {
+      try {
+        const stats = player.getStats();
+        
+        if (stats && stats.width && stats.height) {
+          resolutionDiv.textContent = `${stats.width}x${stats.height}`;
+        }
+        
+        if (stats && stats.estimatedBandwidth) {
+          const bitrate = Math.round(stats.estimatedBandwidth / 1000);
+          bitrateDiv.textContent = `${bitrate} kbps`;
+        }
+      } catch (e) {
+        // Ignore errors during stats update
+      }
+    }
+    
+    setInterval(updateStats, 1000);
+
+    // Load stream function
+    async function loadStream(url) {
+      try {
+        showStatus('⏳ Loading stream...', 'loading');
+        await player.load(url);
+        showStatus('✓ Stream loaded successfully', 'success');
+        console.log('✓ Stream loaded:', url);
+      } catch (error) {
+        showStatus(`✗ Error loading stream: ${error.message}`, 'error');
+        console.error('❌ Load error:', error);
+      }
+    }
+
+    // Handle stream type change
+    streamTypeSelect.addEventListener('change', () => {
+      const streamType = streamTypeSelect.value;
+      const isDash = streamType === 'dash';
+      const url = isDash ? dashUrl : hlsUrl;
+      
+      console.log(`Switching to ${streamType.toUpperCase()}: ${url}`);
+      loadStream(url);
+    });
+
+    // Handle quality selection
+    qualitySelect.addEventListener('change', () => {
+      const quality = qualitySelect.value;
+      
+      if (quality === 'auto') {
+        player.configure({
+          abr: {
+            enableAdaptation: true
+          }
+        });
+        console.log('✓ Adaptive bitrate enabled');
+      } else {
+        // Lock to specific quality
+        const variants = player.getVariantTracks();
+        const selectedVariant = variants.find(v => {
+          const height = v.height || 0;
+          return height.toString().startsWith(quality.replace('p', ''));
+        });
+        
+        if (selectedVariant) {
+          player.selectVariantTrack(selectedVariant);
+          console.log(`✓ Locked to quality: ${quality}`);
+        }
+      }
+    });
+
+    // Load button
+    loadBtn.addEventListener('click', () => {
+      const streamType = streamTypeSelect.value;
+      const url = streamType === 'dash' ? dashUrl : hlsUrl;
+      loadStream(url);
+    });
+
+    // Go Live button
+    goLiveBtn.addEventListener('click', () => {
+      const streamType = streamTypeSelect.value;
+      const url = streamType === 'dash' ? dashUrl : hlsUrl;
+      
+      loadStream(url).then(() => {
+        // Jump to live edge
+        video.currentTime = video.duration - 2;
+      });
+    });
+
+    // Status helper
+    function showStatus(message, type = 'loading') {
+      statusDiv.textContent = message;
+      statusDiv.className = `status ${type}`;
+    }
+
+    // Error handling
+    player.addEventListener('error', (event) => {
+      console.error('Player Error:', event.detail);
+      showStatus(`⚠️ Player Error: ${event.detail.message || 'Unknown error'}`, 'error');
+    });
+
+    // DRM error handling
+    player.addEventListener('drmSessionUpdate', (event) => {
+      console.log('DRM Session Update:', event.detail);
+    });
+
+    // Initialize
+    async function init() {
+      try {
+        showStatus('⏳ Initializing player with Clear Key DRM...', 'loading');
+        
+        // Check if shaka player is available
+        if (!window.shaka) {
+          throw new Error('Shaka Player not loaded');
+        }
+
+        // Verify DRM support
+        const support = await shaka.Player.probeSupport();
+        console.log('DRM Support:', support);
+
+        if (support.drm['org.w3c.clearkey']) {
+          console.log('✓ Clear Key DRM supported');
+        } else {
+          console.warn('⚠️ Clear Key DRM not supported on this browser');
+        }
+
+        showStatus('✓ Player initialized successfully. Click "Load Stream" to start.', 'success');
+      } catch (error) {
+        console.error('Initialization error:', error);
+        showStatus(`✗ Initialization error: ${error.message}`, 'error');
+      }
+    }
+
+    // Start initialization
+    init();
+  </script>
+</body>
+
+</html>
