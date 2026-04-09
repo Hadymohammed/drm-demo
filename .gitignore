@@ -1,0 +1,4 @@
+*/node_modules
+cdn/storage/live/*
+cdn/storage/vod/*
+packager-lock.json

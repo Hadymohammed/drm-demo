@@ -51,7 +51,7 @@ app.get('/:file', validateToken, (req, res) => {
 app.get('/live/:file', validateToken, (req, res) => {
   const file = req.params.file;
   // is file .mpd||m4s or .m3u8||.ts
-  const type = file.endsWith('.mpd') || file.endsWith('.m4s') ? 'dash' : file.endsWith('.m3u8') || file.endsWith('.ts') ? 'hls' : 'unknown';
+  const type = file.endsWith('.mpd') || file.endsWith('.m4s') || file.endsWith('.mp4') ? 'dash' : file.endsWith('.m3u8') || file.endsWith('.ts') ? 'hls' : 'unknown';
 
   const filePath = path.join(VIDEO_DIR, `live/${type}`, file);
 

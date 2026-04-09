@@ -34,8 +34,7 @@
     player.configure({
       drm: {
         servers: {
-          // 'com.widevine.alpha': 'http://192.168.1.102:3000/license?type=widevine',
-          'org.w3.clearkey': 'http://localhost:3000/license?type=clearkey&token=correct',
+          'org.w3.clearkey': 'http://192.168.1.102:3000/license?type=clearkey&token=correct',
         }
       }
     });
@@ -46,7 +45,6 @@
         const url = new URL(request.uris[0]);
         url.searchParams.set('token', 'correct');
         request.uris[0] = url.toString();
-        console.log('🔗 Modified segment request URL:', request.uris[0]);
       }
     });
 
